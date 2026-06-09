@@ -1,0 +1,9 @@
+What time is it?
+
+What's the weather in Chennai?
+
+Show all students.
+
+Who has highest CGPA?
+
+List available tools.

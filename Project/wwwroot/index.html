@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Agent — Tool-Calling Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-root:      #0b0e14;
+      --bg-bar:       #0f1320;
+      --bg-card:      #0e1420;
+      --bg-input:     #080c14;
+      --bg-hover:     #111c2e;
+      --border:       #1a2030;
+      --border-hover: #2a3858;
+
+      --cyan:   #4ec9b0;
+      --purple: #c678dd;
+      --green:  #98c379;
+      --yellow: #e5c07b;
+      --orange: #d19a66;
+      --blue:   #61afef;
+      --red:    #e06c75;
+      --oai:    #10a37f;
+      --white:  #c8d0e0;
+      --muted:  #3a4a60;
+      --dim:    #1e2840;
+
+      --font: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+      --radius: 6px;
+    }
+
+    html, body {
+      height: 100%;
+      background: #060810;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font);
+    }
+
+    /* ── Terminal Shell ───────────────────────────────────── */
+    .terminal {
+      width: 820px;
+      max-width: 98vw;
+      background: var(--bg-root);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 0 1px #0006, 0 24px 60px #000a;
+      min-height: 600px;
+      max-height: 96vh;
+    }
+
+    /* ── Title Bar ────────────────────────────────────────── */
+    .titlebar {
+      background: var(--bg-bar);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+    .titlebar-name { color: #2e4060; font-size: 11px; margin-left: 4px; letter-spacing: .06em; }
+
+    /* Provider toggle */
+    .prov-group { margin-left: auto; display: flex; gap: 4px; }
+    .prov-btn {
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 3px 11px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      letter-spacing: .03em;
+    }
+    .prov-btn:hover { border-color: var(--border-hover); color: #5a7090; }
+    .prov-btn.ant-active { border-color: var(--purple); color: var(--purple); background: #160d22; }
+    .prov-btn.oai-active { border-color: var(--oai);    color: var(--oai);    background: #051510; }
+
+    /* ── Token Status Bar ─────────────────────────────────── */
+    .tokenbar {
+      background: #090d18;
+      border-bottom: 1px solid var(--border);
+      padding: 5px 16px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .tk-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px 0 0;
+      margin-right: 14px;
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .tk-cell:last-child { border-right: none; margin-right: 0; }
+    .tk-label { font-size: 10px; color: var(--muted); letter-spacing: .06em; }
+    .tk-val   { font-size: 12px; font-weight: 500; color: var(--white); min-width: 36px; }
+    .tk-icon  { font-size: 13px; }
+    .tk-in    { color: var(--cyan);   }
+    .tk-out   { color: var(--purple); }
+    .tk-total { color: var(--yellow); }
+    .tk-calls { color: var(--oai);    }
+    .tk-cost  { color: var(--green);  }
+    .tk-bar-fill {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      flex: 1;
+      min-width: 60px;
+      overflow: hidden;
+    }
+    .tk-bar-inner {
+      height: 100%;
+      background: var(--cyan);
+      border-radius: 2px;
+      transition: width .4s ease;
+      width: 0%;
+    }
+
+    /* ── Tab Bar ──────────────────────────────────────────── */
+    .tabbar {
+      background: var(--bg-root);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-shrink: 0;
+    }
+    .tab {
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 7px 14px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .15s;
+      letter-spacing: .04em;
+      user-select: none;
+    }
+    .tab:hover { color: #5a7898; }
+    .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+    .model-pill {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--muted);
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 8px;
+      letter-spacing: .03em;
+    }
+
+    /* ── Chat Panel ───────────────────────────────────────── */
+    .chat-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    .chat-panel.hidden { display: none; }
+
+    .output {
+      flex: 1;
+      padding: 14px 18px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-height: 0;
+    }
+    .output::-webkit-scrollbar { width: 5px; }
+    .output::-webkit-scrollbar-track { background: transparent; }
+    .output::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .line { font-size: 12.5px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+    .sep  { border: none; border-top: 1px solid #141c28; margin: 8px 0; }
+
+    /* Bubbles */
+    .bubble { border-left: 2px solid; padding: 5px 0 5px 11px; margin: 7px 0; }
+    .bub-user { border-color: var(--cyan); }
+    .bub-ant  { border-color: var(--purple); }
+    .bub-oai  { border-color: var(--oai); }
+    .bub-tool { border-color: var(--yellow); }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--font);
+      margin-right: 5px;
+      letter-spacing: .03em;
+    }
+    .bdg-user { background: #071818; color: var(--cyan);   border: 1px solid #0e2828; }
+    .bdg-ant  { background: #120820; color: var(--purple); border: 1px solid #200e38; }
+    .bdg-oai  { background: #041410; color: var(--oai);    border: 1px solid #082820; }
+    .bdg-tool { background: #181400; color: var(--yellow); border: 1px solid #2a2200; }
+    .bdg-res  { background: #061408; color: var(--green);  border: 1px solid #0e2810; }
+
+    /* Spinner */
+    .spin { display: inline-block; animation: rotate .6s linear infinite; }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+
+    /* Cursor blink */
+    .cur {
+      display: inline-block;
+      width: 6px; height: 12px;
+      background: var(--cyan);
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+      margin-left: 1px;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── Input Row ────────────────────────────────────────── */
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      background: var(--bg-root);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .prompt-sym { font-size: 14px; flex-shrink: 0; }
+    .sym-ant { color: var(--purple); }
+    .sym-oai { color: var(--oai); }
+    #user-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--white);
+      font-family: var(--font);
+      font-size: 12.5px;
+      caret-color: var(--cyan);
+    }
+    #user-input::placeholder { color: #1e2e40; }
+    .send-btn {
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 4px 11px;
+      border-radius: var(--radius);
+      border: 1px solid #1e3048;
+      background: #0e1828;
+      color: var(--cyan);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all .15s;
+      letter-spacing: .02em;
+    }
+    .send-btn:hover  { background: #162030; border-color: #2e4868; }
+    .send-btn:active { transform: scale(.97); }
+    .send-btn:disabled { opacity: .35; cursor: default; transform: none; }
+
+    /* ── Tools Panel ──────────────────────────────────────── */
+    .tools-panel, .config-panel, .stats-panel {
+      padding: 14px 16px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+    .tools-panel.visible, .config-panel.visible, .stats-panel.visible { display: flex; }
+
+    .tool-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .tool-row:hover { border-color: var(--border-hover); }
+    .tool-name { color: var(--cyan); font-size: 12px; min-width: 155px; flex-shrink: 0; }
+    .tool-meta { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+    .tool-meta span { color: #2e4a68; }
+
+    /* ── Config Panel ─────────────────────────────────────── */
+    .cfg-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px 13px;
+    }
+    .cfg-title { font-size: 10px; color: var(--muted); letter-spacing: .08em; margin-bottom: 8px; }
+    .cfg-row   { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .cfg-row:last-child { margin-bottom: 0; }
+    .cfg-key   { font-size: 11px; color: #2e4060; min-width: 88px; }
+    .cfg-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--white);
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 3px 8px;
+      outline: none;
+    }
+    .cfg-input:focus { border-color: #2e4868; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dot-on  { background: #28c840; }
+    .dot-off { background: #2e3850; }
+
+    /* ── Stats Panel ──────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 13px;
+    }
+    .stat-label { font-size: 10px; color: var(--muted); letter-spacing: .06em; margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 700; }
+    .stat-sub   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .history-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .history-table th {
+      text-align: left;
+      color: var(--muted);
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: .05em;
+      font-weight: 400;
+    }
+    .history-table td {
+      padding: 5px 8px;
+      color: var(--white);
+      border-bottom: 1px solid #0e1420;
+      font-size: 11px;
+    }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: #0e1828; }
+    .history-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    /* ── Scrollbars global ────────────────────────────────── */
+    *::-webkit-scrollbar       { width: 4px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<div class="terminal">
+
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <div class="dot dot-r"></div>
+    <div class="dot dot-y"></div>
+    <div class="dot dot-g"></div>
+    <span class="titlebar-name">ai-agent — tool-calling console v2.0</span>
+    <div class="prov-group">
+      <button class="prov-btn ant-active" id="btn-ant" onclick="switchProvider('anthropic')">● Anthropic</button>
+      <button class="prov-btn"            id="btn-oai" onclick="switchProvider('openai')">○ OpenAI</button>
+    </div>
+  </div>
+
+  <!-- Token Status Bar -->
+  <div class="tokenbar">
+    <div class="tk-cell">
+      <span class="tk-icon tk-in">↑</span>
+      <span class="tk-label">INPUT</span>
+      <span class="tk-val tk-in" id="tk-in">0</span>
+    </div>
+    <div class="tk-cell">
+      <span class="tk-icon tk-out">↓</span>
+      <span class="tk-label">OUTPUT</span>
+      <span class="tk-val tk-out" id="tk-out">0</span>
+    </div>
+    <div class="tk-cell">
+      <span class="tk-icon tk-total">∑</span>
+      <span class="tk-label">TOTAL</span>
+      <span class="tk-val tk-total" id="tk-total">0</span>
+    </div>
+    <div class="tk-cell">
+      <span class="tk-icon tk-calls">⚙</span>
+      <span class="tk-label">TOOL CALLS</span>
+      <span class="tk-val tk-calls" id="tk-calls">0</span>
+    </div>
+    <div class="tk-cell">
+      <span class="tk-icon tk-cost">$</span>
+      <span class="tk-label">EST. COST</span>
+      <span class="tk-val tk-cost" id="tk-cost">$0.0000</span>
+    </div>
+    <div class="tk-cell" style="flex:1; gap:8px;">
+      <span class="tk-label">CTX</span>
+      <div class="tk-bar-fill">
+        <div class="tk-bar-inner" id="tk-bar"></div>
+      </div>
+      <span class="tk-label" id="tk-ctx-pct">0%</span>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tabbar">
+    <div class="tab active" data-tab="chat">terminal</div>
+    <div class="tab" data-tab="tools">tools (5)</div>
+    <div class="tab" data-tab="config">config</div>
+    <div class="tab" data-tab="stats">token stats</div>
+    <span class="model-pill" id="model-pill">claude-3-5-haiku-20241022</span>
+  </div>
+
+  <!-- ── CHAT PANEL ─────────────────────────────── -->
+  <div class="chat-panel" id="chat-panel">
+    <div class="output" id="output"></div>
+    <div class="input-row">
+      <span class="prompt-sym sym-ant" id="prompt-sym">◉</span>
+      <input id="user-input" placeholder="Ask anything… e.g. What's the weather in Tokyo?" autocomplete="off" spellcheck="false" />
+      <button class="send-btn" id="send-btn">send ↵</button>
+    </div>
+  </div>
+
+  <!-- ── TOOLS PANEL ────────────────────────────── -->
+  <div class="tools-panel" id="tools-panel">
+    <div class="tool-row" data-q="What is the weather in Paris and New York?">
+      <span class="tool-name">get_weather</span>
+      <span class="tool-meta"><span>city: string</span> — current weather for a given city</span>
+    </div>
+    <div class="tool-row" data-q="Calculate 144 * 3.14159 + 99">
+      <span class="tool-name">calculate</span>
+      <span class="tool-meta"><span>expression: string</span> — evaluate a math expression</span>
+    </div>
+    <div class="tool-row" data-q="What is the current date and time?">
+      <span class="tool-name">get_current_time</span>
+      <span class="tool-meta"><span>(no args)</span> — return current local date and time</span>
+    </div>
+    <div class="tool-row" data-q="Search knowledge base for: Anthropic">
+      <span class="tool-name">search_knowledge</span>
+      <span class="tool-meta"><span>query: string</span> — query internal knowledge base</span>
+    </div>
+    <div class="tool-row" data-q="What is the stock price of NVDA?">
+      <span class="tool-name">get_stock_price</span>
+      <span class="tool-meta"><span>ticker: string</span> — fetch simulated stock price</span>
+    </div>
+  </div>
+
+  <!-- ── CONFIG PANEL ───────────────────────────── -->
+  <div class="config-panel" id="config-panel">
+    <div class="cfg-section">
+      <div class="cfg-title">ANTHROPIC</div>
+      <div class="cfg-row">
+        <span class="cfg-key">model</span>
+        <input class="cfg-input" id="ant-model" value="claude-3-5-haiku-20241022" />
+      </div>
+      <div class="cfg-row">
+        <span class="cfg-key">api key</span>
+        <input class="cfg-input" id="ant-key" type="password" placeholder="sk-ant-api03-…" />
+      </div>
+      <div class="cfg-row">
+        <span class="cfg-key">pricing</span>
+        <span style="font-size:11px;color:var(--muted)">$0.80 / 1M input  ·  $4.00 / 1M output  (haiku)</span>
+      </div>
+      <div class="cfg-row" style="gap:6px">
+        <div class="status-dot dot-on" id="ant-status-dot"></div>
+        <span style="font-size:11px;color:#28c840" id="ant-status-text">connected (demo mode)</span>
+      </div>
+    </div>
+    <div class="cfg-section">
+      <div class="cfg-title">OPENAI</div>
+      <div class="cfg-row">
+        <span class="cfg-key">model</span>
+        <input class="cfg-input" id="oai-model" value="gpt-4o-mini" />
+      </div>
+      <div class="cfg-row">
+        <span class="cfg-key">api key</span>
+        <input class="cfg-input" id="oai-key" type="password" placeholder="sk-proj-…" />
+      </div>
+      <div class="cfg-row">
+        <span class="cfg-key">pricing</span>
+        <span style="font-size:11px;color:var(--muted)">$0.15 / 1M input  ·  $0.60 / 1M output  (4o-mini)</span>
+      </div>
+      <div class="cfg-row" style="gap:6px">
+        <div class="status-dot dot-off" id="oai-status-dot"></div>
+        <span style="font-size:11px;color:var(--muted)" id="oai-status-text">standby</span>
+      </div>
+    </div>
+    <div class="cfg-section">
+      <div class="cfg-title">REGISTERED TOOLS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;padding-top:2px">
+        <span class="badge bdg-tool">get_weather</span>
+        <span class="badge bdg-tool">calculate</span>
+        <span class="badge bdg-tool">get_current_time</span>
+        <span class="badge bdg-tool">search_knowledge</span>
+        <span class="badge bdg-tool">get_stock_price</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STATS PANEL ────────────────────────────── -->
+  <div class="stats-panel" id="stats-panel">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">TOTAL TOKENS USED</div>
+        <div class="stat-value" style="color:var(--yellow)" id="st-total">0</div>
+        <div class="stat-sub" id="st-total-sub">in + out</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">INPUT TOKENS</div>
+        <div class="stat-value" style="color:var(--cyan)" id="st-in">0</div>
+        <div class="stat-sub">prompt + context</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">OUTPUT TOKENS</div>
+        <div class="stat-value" style="color:var(--purple)" id="st-out">0</div>
+        <div class="stat-sub">completions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">TOOL CALLS</div>
+        <div class="stat-value" style="color:var(--oai)" id="st-calls">0</div>
+        <div class="stat-sub">total executions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">MESSAGES</div>
+        <div class="stat-value" style="color:var(--green)" id="st-msgs">0</div>
+        <div class="stat-sub">turns in session</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">EST. COST</div>
+        <div class="stat-value" style="color:var(--green)" id="st-cost">$0.0000</div>
+        <div class="stat-sub">based on model pricing</div>
+      </div>
+    </div>
+
+    <div class="history-wrap">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>PROVIDER</th>
+            <th>USER QUERY</th>
+            <th>IN</th>
+            <th>OUT</th>
+            <th>TOOLS</th>
+            <th>COST</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:16px">No messages yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let provider = 'anthropic';
+let busy     = false;
+
+const tokens = {
+  in: 0, out: 0, calls: 0, msgs: 0,
+  history: [],
+  get total() { return this.in + this.out; }
+};
+
+const CTX_LIMIT = 200_000;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const esc   = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const ts    = () => new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const output = document.getElementById('output');
+
+function addLine(html, cls) {
+  const d = document.createElement('div');
+  d.className = 'line ' + (cls || '');
+  d.innerHTML = html;
+  output.appendChild(d);
+  output.scrollTop = 99999;
+  return d;
+}
+function addSep() {
+  const h = document.createElement('hr');
+  h.className = 'sep';
+  output.appendChild(h);
+  output.scrollTop = 99999;
+}
+function makeBubble(bubClass, bdgClass, icon, role, content) {
+  const d = document.createElement('div');
+  d.className = 'bubble ' + bubClass;
+  d.innerHTML = `<div class="line" style="margin-bottom:3px">
+    <span class="badge ${bdgClass}">${icon} ${role}</span>
+    <span style="color:var(--dim);font-size:10px">${ts()}</span>
+  </div>
+  <div class="line" style="color:var(--white);padding-left:2px">${content}</div>`;
+  output.appendChild(d);
+  output.scrollTop = 99999;
+  return d;
+}
+
+// ── Token UI ──────────────────────────────────────────────────────────────────
+function updateTokenUI() {
+  const pct = Math.min(100, (tokens.total / CTX_LIMIT) * 100).toFixed(1);
+
+  document.getElementById('tk-in').textContent      = tokens.in.toLocaleString();
+  document.getElementById('tk-out').textContent     = tokens.out.toLocaleString();
+  document.getElementById('tk-total').textContent   = tokens.total.toLocaleString();
+  document.getElementById('tk-calls').textContent   = tokens.calls;
+  document.getElementById('tk-cost').textContent    = '$0.0000';
+  document.getElementById('tk-bar').style.width     = pct + '%';
+  document.getElementById('tk-ctx-pct').textContent = pct + '%';
+
+  document.getElementById('st-in').textContent      = tokens.in.toLocaleString();
+  document.getElementById('st-out').textContent     = tokens.out.toLocaleString();
+  document.getElementById('st-total').textContent   = tokens.total.toLocaleString();
+  document.getElementById('st-calls').textContent   = tokens.calls;
+  document.getElementById('st-msgs').textContent    = tokens.msgs;
+  document.getElementById('st-cost').textContent    = '$0.0000';
+  document.getElementById('st-total-sub').textContent = `${tokens.in.toLocaleString()} in + ${tokens.out.toLocaleString()} out`;
+
+  const tbody = document.getElementById('history-body');
+  if (tokens.history.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:16px">No messages yet</td></tr>';
+  } else {
+    tbody.innerHTML = tokens.history.map((r, i) => `
+      <tr>
+        <td style="color:var(--muted)">${i + 1}</td>
+        <td><span class="badge ${r.bdg}" style="font-size:9px">${r.prov}</span></td>
+        <td style="color:var(--white);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.query)}</td>
+        <td style="color:var(--cyan)">${r.in}</td>
+        <td style="color:var(--purple)">${r.out}</td>
+        <td style="color:var(--oai)">${r.tools}</td>
+        <td style="color:var(--green)">—</td>
+      </tr>`).join('');
+  }
+}
+
+// ── Send Handler ──────────────────────────────────────────────────────────────
+// TODO: wire up your API call here. userText is the string the user typed.
+async function handleSend(userText) {
+  if (busy) return;
+  busy = true;
+  document.getElementById('send-btn').disabled    = true;
+  document.getElementById('user-input').disabled  = true;
+
+  const isAnt = provider === 'anthropic';
+  const bubCls = isAnt ? 'bub-ant' : 'bub-oai';
+  const bdgCls = isAnt ? 'bdg-ant' : 'bdg-oai';
+  const icon   = isAnt ? '◈' : '⬡';
+  const label  = isAnt ? 'Anthropic' : 'OpenAI';
+
+  addSep();
+  makeBubble('bub-user', 'bdg-user', '◉', 'You', esc(userText));
+
+  // Thinking indicator
+  const thinkEl = addLine(
+    `<span class="spin" style="color:${isAnt ? 'var(--purple)' : 'var(--oai)'}">◌</span> ` +
+    `<span style="color:var(--muted)">waiting for response</span><span style="color:var(--dim)">…</span>`
+  );
+
+  // ── Replace the block below with your real API call ───────────────────────
+  // Example shape of what you'd do:
+  //
+  //   const res  = await fetch('/api/chat', { method:'POST', body: JSON.stringify({ message: userText }) });
+  //   const data = await res.json();
+  //   const reply     = data.reply;
+  //   const inTokens  = data.usage?.input_tokens  ?? 0;
+  //   const outTokens = data.usage?.output_tokens ?? 0;
+  //
+  // For now we just show a placeholder:
+  const model =
+    provider === "anthropic"
+      ? document.getElementById("ant-model").value
+      : document.getElementById("oai-model").value;
+
+  const data = await callAgentAPI(userText, provider, model);
+
+  const reply = data.reply ?? "No response";
+
+  const inTokens =
+      data.usage?.inputTokens ?? 0;
+
+  const outTokens =
+      data.usage?.outputTokens ?? 0;
+
+  tokens.calls +=
+      data.usage?.toolCalls ?? 0;
+  // ─────────────────────────────────────────────────────────────────────────
+
+  makeBubble(bubCls, bdgCls, icon, label, esc(reply));
+
+  tokens.in   += inTokens;
+  tokens.out  += outTokens;
+  tokens.msgs += 1;
+  tokens.history.push({
+    prov:  label,
+    bdg:   bdgCls,
+    query: userText.slice(0, 50) + (userText.length > 50 ? '…' : ''),
+    in:    inTokens,
+    out:   outTokens,
+    tools: 0
+  });
+
+  updateTokenUI();
+  busy = false;
+  document.getElementById('send-btn').disabled   = false;
+  document.getElementById('user-input').disabled = false;
+  document.getElementById('user-input').focus();
+}
+
+// ── Provider Switcher ─────────────────────────────────────────────────────────
+function switchProvider(p) {
+  provider = p;
+  const isAnt = p === 'anthropic';
+
+  document.getElementById('btn-ant').className = 'prov-btn' + (isAnt ? ' ant-active' : '');
+  document.getElementById('btn-oai').className = 'prov-btn' + (!isAnt ? ' oai-active' : '');
+
+  const sym = document.getElementById('prompt-sym');
+  sym.className = 'prompt-sym ' + (isAnt ? 'sym-ant' : 'sym-oai');
+
+  const modelKey = isAnt ? 'ant-model' : 'oai-model';
+  document.getElementById('model-pill').textContent = document.getElementById(modelKey).value;
+
+  document.getElementById('ant-status-dot').className   = 'status-dot ' + (isAnt  ? 'dot-on' : 'dot-off');
+  document.getElementById('ant-status-text').style.color = isAnt  ? '#28c840' : 'var(--muted)';
+  document.getElementById('ant-status-text').textContent = isAnt  ? 'active' : 'standby';
+  document.getElementById('oai-status-dot').className   = 'status-dot ' + (!isAnt ? 'dot-on' : 'dot-off');
+  document.getElementById('oai-status-text').style.color = !isAnt ? '#28c840' : 'var(--muted)';
+  document.getElementById('oai-status-text').textContent = !isAnt ? 'active' : 'standby';
+
+  addSep();
+  const badge = isAnt
+    ? `<span class="badge bdg-ant">● Anthropic</span>`
+    : `<span class="badge bdg-oai">⬡ OpenAI</span>`;
+  const model = document.getElementById(modelKey).value;
+  addLine(`${badge}<span style="color:var(--muted);font-size:11px"> provider switched — </span><span style="color:var(--white);font-size:11px">${esc(model)}</span>`);
+}
+
+// ── Tab Switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const tab = t.dataset.tab;
+    document.getElementById('chat-panel').classList.toggle('hidden', tab !== 'chat');
+    document.getElementById('tools-panel').classList.toggle('visible', tab === 'tools');
+    document.getElementById('config-panel').classList.toggle('visible', tab === 'config');
+    document.getElementById('stats-panel').classList.toggle('visible', tab === 'stats');
+    if (tab === 'stats') updateTokenUI();
+  });
+});
+
+// ── Tool Rows → prefill input ─────────────────────────────────────────────────
+document.querySelectorAll('.tool-row').forEach(r => {
+  r.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelector('[data-tab="chat"]').classList.add('active');
+    document.getElementById('chat-panel').classList.remove('hidden');
+    document.getElementById('tools-panel').classList.remove('visible');
+    document.getElementById('config-panel').classList.remove('visible');
+    document.getElementById('stats-panel').classList.remove('visible');
+    const inp = document.getElementById('user-input');
+    inp.value = r.dataset.q;
+    inp.focus();
+  });
+});
+
+// ── Send button & Enter key ───────────────────────────────────────────────────
+document.getElementById('send-btn').addEventListener('click', () => {
+  const v = document.getElementById('user-input').value.trim();
+  if (!v || busy) return;
+  document.getElementById('user-input').value = '';
+  handleSend(v);
+});
+document.getElementById('user-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = document.getElementById('user-input').value.trim();
+    if (!v || busy) return;
+    document.getElementById('user-input').value = '';
+    handleSend(v);
+  }
+});
+
+// Model input → update pill
+['ant-model', 'oai-model'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    const isActive = (id === 'ant-model' && provider === 'anthropic') ||
+                     (id === 'oai-model' && provider === 'openai');
+    if (isActive) document.getElementById('model-pill').textContent = e.target.value;
+  });
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async () => {
+  addLine('<span style="color:var(--dim)">╔══════════════════════════════════════════════════════╗</span>');
+  addLine('<span style="color:var(--dim)">║</span>  <span style="color:var(--cyan);font-weight:700">AI AGENT</span>  <span style="color:var(--dim)">·</span>  <span style="color:var(--muted)">Tool-Calling Console</span>  <span style="color:var(--dim)">·</span>  <span style="color:var(--purple)">v2.0</span>  <span style="color:var(--dim)">║</span>');
+  addLine('<span style="color:var(--dim)">╚══════════════════════════════════════════════════════╝</span>');
+  await sleep(200);
+  addLine('');
+  addLine(`<span class="badge bdg-ant">● Anthropic</span>  <span style="color:var(--muted)">claude-3-5-haiku-20241022</span>  <span style="color:#28c840;font-size:11px">● active</span>`);
+  addLine(`<span class="badge bdg-oai">⬡ OpenAI</span>    <span style="color:var(--muted)">gpt-4o-mini</span>  <span style="color:var(--dim);font-size:11px">○ standby</span>`);
+  addLine('');
+  addLine('<span style="color:var(--dim)">────────────────────────────────────────────────────────</span>');
+  addLine('<span style="color:var(--yellow);font-size:11px">✓ backend connected at /api/chat</span><span style="color:var(--dim);font-size:11px"> — wire up your API in </span><span style="color:var(--cyan);font-size:11px">handleSend()</span>');
+  addLine('<span style="color:var(--dim)">────────────────────────────────────────────────────────</span>');
+  document.getElementById('user-input').focus();
+  updateTokenUI();
+})();
+</script>
+<script src="js/agent.js"></script>
+<script src="js/tokenStats.js"></script>
+</body>
+</html>
