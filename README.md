@@ -180,8 +180,8 @@ toolforge-agent/
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/<your-org>/toolforge-agent.git
-cd toolforge-agent
+git clone https://github.com/PriyadharshiniKannan-22/Console-Agent
+cd Project
 ```
 
 ### Step 2 — Configure API Keys
