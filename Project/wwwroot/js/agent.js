@@ -1,10 +1,8 @@
 // agent.js — wire the frontend terminal to POST /api/chat
-// Drop this into web/js/ and include it AFTER the UI HTML is rendered.
 
 const API_BASE = window.location.origin; // same-origin when served by ASP.NET
 
 // Called by the terminal UI when the user hits Enter or clicks Send.
-// Replaces the TODO block in front_end.html's handleSend().
 async function callAgentAPI(userText, provider, model) {
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
@@ -18,7 +16,6 @@ async function callAgentAPI(userText, provider, model) {
   }
 
   return await res.json();
-  // Returns: { reply: string, usage: { inputTokens, outputTokens, toolCalls } }
 }
 
 // Export for use in the main UI script

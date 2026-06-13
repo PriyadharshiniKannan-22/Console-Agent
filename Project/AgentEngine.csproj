@@ -12,10 +12,4 @@
     <PackageReference Include="TimeZoneConverter" Version="7.2.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="tests\**\*.cs" />
-    <Compile Remove="src\Program.cs" />
-    <None Include="tests\**\*" />
-  </ItemGroup>
-
 </Project>

@@ -1,9 +1,23 @@
-What time is it?
+What time is it in Asia/Kolkata?
+
+What time is it in Europe/London?
 
 What's the weather in Chennai?
 
-Show all students.
+What's the weather in Tokyo?
 
-Who has highest CGPA?
+Show all employees.
 
-List available tools.
+How many employees are in the database?
+
+List all products.
+
+What products do we sell?
+
+Show all employees in Engineering.
+
+Which product has the highest stock?
+
+Show all product names and prices.
+
+List employees with salary greater than 80000.

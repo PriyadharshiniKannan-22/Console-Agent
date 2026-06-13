@@ -36,6 +36,8 @@ public class SqliteTool
             await using var command =
                 new SqliteCommand(query, connection);
 
+            command.CommandTimeout = 3;
+
             await using var reader =
                 await command.ExecuteReaderAsync();
 
@@ -44,8 +46,18 @@ public class SqliteTool
 
             var sb = new StringBuilder();
 
+            int rowCount = 0;
+
             while (await reader.ReadAsync())
             {
+                if (rowCount >= 200)
+                {
+                    sb.AppendLine(
+                        "... Results truncated (200 row limit reached)"
+                    );
+                    break;
+                }
+
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
                     sb.Append(
@@ -54,6 +66,8 @@ public class SqliteTool
                 }
 
                 sb.AppendLine();
+
+                rowCount++;
             }
 
             return sb.ToString();
